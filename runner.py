@@ -1,7 +1,11 @@
-import base64, json, os, subprocess, sys, tempfile, time, urllib.parse, urllib.request, uuid
+import base64, json, os, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request, uuid
 
-WORKER = os.environ["WORKER_URL"].rstrip("/")
-SECRET = os.environ["RUNNER_SECRET"]
+WORKER = os.environ["WORKER_URL"].strip().rstrip("/")
+SECRET = os.environ["RUNNER_SECRET"].strip()
+if not WORKER.startswith(("https://", "http://")):
+    raise RuntimeError("WORKER_URL must start with https://")
+if "/telegram/webhook" in WORKER or "/runner/" in WORKER:
+    raise RuntimeError("WORKER_URL must be the Worker root URL only, without /telegram/webhook or /runner/due")
 
 def b64(s):
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4)).decode()
@@ -63,7 +67,21 @@ def post_result(cid, ok, ping=None, error=None):
 
 def main():
     req=urllib.request.Request(WORKER+"/runner/due",headers={"Authorization":"Bearer "+SECRET})
-    with urllib.request.urlopen(req,timeout=20) as r: items=json.load(r).get("configs",[])
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            items = json.load(r).get("configs", [])
+            print("Worker /runner/due status:", r.status)
+            print("Due configurations:", len(items))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        print("Worker /runner/due HTTP status:", e.code, file=sys.stderr)
+        print("Worker response body:", body, file=sys.stderr)
+        print("Check WORKER_URL and RUNNER_SECRET in GitHub Actions.", file=sys.stderr)
+        raise
+    except urllib.error.URLError as e:
+        print("Could not reach Worker:", e.reason, file=sys.stderr)
+        print("Check WORKER_URL and the Worker deployment.", file=sys.stderr)
+        raise
     for c in items:
         port=18000+(int(uuid.uuid4().int)%1000); started=time.monotonic(); proc=None
         try:
