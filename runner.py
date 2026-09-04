@@ -60,13 +60,13 @@ def make_config(raw, port):
 
 def post_result(cid, ok, ping=None, error=None):
     data=json.dumps({"id":cid,"ok":ok,"ping_ms":ping,"error":error}).encode()
-    req=urllib.request.Request(WORKER+"/runner/result",data=data,headers={"Authorization":"Bearer "+SECRET,"Content-Type":"application/json"})
+    req=urllib.request.Request(WORKER+"/runner/result",data=data,headers={"Authorization":"Bearer "+SECRET,"Content-Type":"application/json","User-Agent":"Mozilla/5.0 (compatible; ConfigMonitor/1.0; +https://github.com)"})
     try:
         with urllib.request.urlopen(req,timeout=20) as r: r.read()
     except Exception as e: print("result post failed",e,file=sys.stderr)
 
 def main():
-    req=urllib.request.Request(WORKER+"/runner/due",headers={"Authorization":"Bearer "+SECRET})
+    req=urllib.request.Request(WORKER+"/runner/due",headers={"Authorization":"Bearer "+SECRET,"User-Agent":"Mozilla/5.0 (compatible; ConfigMonitor/1.0; +https://github.com)"})
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             items = json.load(r).get("configs", [])
